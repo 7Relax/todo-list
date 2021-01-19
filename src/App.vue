@@ -1,17 +1,20 @@
 <template>
   <section id="app" class="todoapp">
-    <header class="header">
-      <h1>todos</h1>
+    <header class="header d-flex a-center">
+      <h1 class="text-title">待办事项</h1>
       <input
         class="new-todo"
-        placeholder="What needs to be done?"
+        placeholder="需要做什么？"
         autocomplete="off"
         autofocus
         v-model="inputContent"
         @keyup.enter="addTodo"
         >
+      <span class="iconfont icon-zengjia font-23 mr-15"
+        @click="addTodo" v-show="inputContent.trim().length > 0">
+      </span>
     </header>
-    <section class="main">
+    <section class="main" v-show="count">
       <!-- allDone 是一个计算属性 -->
       <input type="checkbox" id="toggle-all" class="toggle-all" v-model="allDone">
       <!-- 当点击 label 的时候其实就是点击了 checkbox -->
@@ -30,9 +33,13 @@
         >
           <div class="view">
             <input type="checkbox" class="toggle" v-model="todo.completed">
+            <!-- <div class="pl-10" @click="todo.completed = !todo.completed">
+              <span class="iconfont icon-circle font-30 text-light-muted" v-show="!todo.completed"></span>
+              <span class="iconfont icon-quangou font-30 text-success" v-show="todo.completed"></span>
+            </div> -->
             <!-- 双击 label 时 调用 editTodo 方法，记录text和更新状态 -->
-            <label @dblclick="editTodo(todo)">{{ todo.text }}</label>
-            <button class="destroy" @click="removeTodo(todo, index)"></button>
+            <label class="" @dblclick="editTodo(todo)">{{ todo.text }}</label>
+            <button class="destroy" @click="removeTodo(todo)"></button>
           </div>
           <!-- 在自定义指令中可以获取到值，这个值是动态的，如果是true
             则说明是当前正在编辑的文本框 -->
@@ -48,9 +55,15 @@
         </li>
       </ul>
     </section>
-    <footer class="footer">
+    <footer class="footer" v-show="count">
       <span class="todo-count">
-        <strong>1</strong> item left
+        <span v-show="type === 'all' || type === 'active'">
+          <strong class="text-red">{{ remainingCount }}</strong> 未完成
+        </span>
+        <span v-show="type === 'all'">,</span>
+        <span v-show="type === 'all' || type === 'completed'">
+          <strong class="text-red">{{ count - remainingCount }}</strong> 已完成
+        </span>
       </span>
       <ul class="filters">
         <!-- 超链接的href属性此时是一个锚点，这里不使用路由，这个功能自己来实现
@@ -58,25 +71,35 @@
           当组件卸载的时候 hashChange 事件移除，在hashChange 事件中我们要获取
           当前锚点的值，只需要这里的单词 all，active，completed，所以可以去掉 #/
           然后根据 hash 来判断要获取哪种状态的待办事项列表 -->
-        <li><a href="#/all">All</a></li>
-        <li><a href="#/active">Active</a></li>
-        <li><a href="#/completed">Completed</a></li>
+        <li><a href="#/all" :class="type === 'all' ? 'text-red' : ''">全部</a></li>
+        <li><a href="#/active" :class="type === 'active' ? 'text-red' : ''">未完成</a></li>
+        <li><a href="#/completed" :class="type === 'completed' ? 'text-red' : ''">已完成</a></li>
       </ul>
-      <button class="clear-completed">
-        Clear completed
+      <!-- 清除已完成待办项的按钮 -->
+      <button class="clear-completed text-oper"
+        @click="removeCompleted"
+        v-show="count > remainingCount">
+        清除已完成
       </button>
     </footer>
   </section>
   <footer class="info">
-    <p>Double-click to edit a todo</p>
-    <p>Written by <a href="http://evanyou.me">Evan You</a></p>
-    <p>Part of <a href="http://todomvc.com">TodoMVC</a></p>
+    <p>双击：以编辑待办项</p>
+    <p>作者：<a>Seven Long</a></p>
   </footer>
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import './assets/index.css'
+import useLocalStorage from './utils/useLocalStorage'
+import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue'
+import './assets/css/index.css'
+import './assets/css/base.css'
+import './assets/css/icon.css'
+
+// 由于 useLocalStorage 模块返回的是一个函数，
+// 所以要调用这个函数来返回我们想要结果
+const storage = useLocalStorage()
+
 // 为了代码的可维护性，把每一个逻辑都封装到一个独立的函数中
 // 1. 添加待办事项
 const useAdd = (todos) => {
@@ -107,8 +130,13 @@ const useRemove = (todos) => {
     const index2 = todos.value.indexOf(todo)
     todos.value.splice(index2, 1)
   }
+  // 移除已完成的待办项
+  const removeCompleted = () => {
+    todos.value = todos.value.filter(todo => !todo.completed)
+  }
   return {
-    removeTodo
+    removeTodo,
+    removeCompleted
   }
 }
 
@@ -153,7 +181,7 @@ const useEdit = (removeTodo) => {
 
 }
 
-// 4.切换待办项的完成状态
+// 4. 切换待办项的完成状态
 const useFilter = (todos) => {
   // 创建计算属性，分别设置 getter、setter，
   // 当渲染 checkbox 的时候会调用 getter 获取当前状态
@@ -193,6 +221,10 @@ const useFilter = (todos) => {
 
   // 定义一个计算属性，调用过滤方法返回过滤后的待办项
   const filteredTodos = computed(() => filter[type.value](todos.value))
+  // 未完成的待办事项个数
+  const remainingCount = computed(() => filter.active(todos.value).length)
+  // 待办事项的总数
+  const count = computed(() => todos.value.length)
 
   // 定义 hashchange 事件的处理方法
   const onHashChange = () => {
@@ -226,19 +258,35 @@ const useFilter = (todos) => {
 
   return {
     allDone,
-    filteredTodos
+    filteredTodos,
+    type,
+    remainingCount,
+    count
   }
+}
+
+// 5. 存储待办事项
+const useStorage = () => {
+  const KEY = 'TODO_KEY'
+  const todos = ref(storage.getItem(KEY) || [])
+  // 监听 todos 的变化
+  watchEffect(() => {
+    storage.setItem(KEY, todos.value)
+  })
+  return todos
 }
 
 export default {
   name: 'App',
   setup() {
     // 创建一个响应式的 空数组，用来存放用户所有的待办事项
-    const todos = ref([])
-    const { removeTodo } = useRemove(todos)
+    // const todos = ref([])
+    const todos = useStorage()
+    const { removeTodo, removeCompleted } = useRemove(todos)
     return {
       todos,
       removeTodo,
+      removeCompleted,
       // 调用 方法 并解构
       ...useAdd(todos),
       ...useEdit(removeTodo),
@@ -257,4 +305,18 @@ export default {
 </script>
 
 <style>
+  .text-red {
+    color: rgb(226, 119, 119) !important;
+  }
+  .text-title {
+    color: #eabfbf !important;
+    font-size: 50px !important;
+    top: -110px !important;
+  }
+  .text-oper {
+    color: #968cbf !important;
+  }
+  .todoapp h1 {
+    font-weight: 400 !important;
+  }
 </style>
