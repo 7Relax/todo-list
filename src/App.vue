@@ -39,6 +39,7 @@
             </div> -->
             <!-- 双击 label 时 调用 editTodo 方法，记录text和更新状态 -->
             <label class="" @dblclick="editTodo(todo)">{{ todo.text }}</label>
+            <span class="create-time text-light-muted font-12">{{ todo.createTime }}</span>
             <button class="destroy" @click="removeTodo(todo)"></button>
           </div>
           <!-- 在自定义指令中可以获取到值，这个值是动态的，如果是true
@@ -91,6 +92,7 @@
 
 <script>
 import useLocalStorage from './utils/useLocalStorage'
+import $TIME from './utils/time'
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue'
 import './assets/css/index.css'
 import './assets/css/base.css'
@@ -108,8 +110,11 @@ const useAdd = (todos) => {
   const addTodo = () => {
     const text = inputContent.value && inputContent.value.trim()
     if (text.length === 0) return
+    // 创建时间
+    const createTime = $TIME.Format(new Date(), 'yyyy-MM-dd hh:mm:ss')
     todos.value.unshift({
       text,
+      createTime,
       completed: false
     })
     // 回车之后，清空用户输入的内容
@@ -305,6 +310,9 @@ export default {
 </script>
 
 <style>
+  body {
+    max-width: 700px;
+  }
   .text-red {
     color: rgb(226, 119, 119) !important;
   }
@@ -318,5 +326,16 @@ export default {
   }
   .todoapp h1 {
     font-weight: 400 !important;
+  }
+  .create-time {
+    position: absolute;
+    top: 20px;
+    right: 47px;
+  }
+  .todo-list li .destroy {
+    margin-bottom: 9px;
+  }
+  .todo-list li label {
+    padding: 15px 165px 15px 60px;
   }
 </style>
